@@ -1,0 +1,9 @@
+condicion de regularidad:
+
+1 Ausente U
+2 Abandonó U
+3 Insuficiente R
+4 Regular A
+5 Promocionó P
+6 No Promocionó N
+100 Insuf. x abandono R
