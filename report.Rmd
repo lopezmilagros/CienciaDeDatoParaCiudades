@@ -1,0 +1,64 @@
+
+---
+title: "Informe: Análisis de Tiempos de Viaje y TTR"
+author: "Equipo"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+library(readxl); library(dplyr); library(ggplot2); library(lubridate)
+df <- read_excel("TrabajoPractico1_Viajes.xlsx")
+names(df) <- make.names(names(df))
+df$HoraInicio <- as.POSIXct(df$HoraInicio, format="%H:%M:%S", tz="UTC")
+df$HoraFin <- as.POSIXct(df$HoraFin, format="%H:%M:%S", tz="UTC")
+df$travel_minutes <- as.numeric(df$Tiempo.de.duración.del.viaje.en.minutos)
+df <- df %>% arrange(Identificación, Día, HoraInicio)
+df <- df %>% group_by(Identificación, Día) %>%
+  mutate(next_HoraInicio = lead(HoraInicio),
+         activity_duration_mins = as.numeric(difftime(next_HoraInicio, HoraFin, units="mins"))) %>%
+  ungroup()
+df$activity_duration_mins <- ifelse(df$activity_duration_mins <= 0, NA, df$activity_duration_mins)
+df$TTR <- ifelse(!is.na(df$activity_duration_mins) & (df$activity_duration_mins + df$travel_minutes) > 0,
+                 df$travel_minutes / (df$travel_minutes + df$activity_duration_mins), NA)
+```
+
+## Resumen ejecutivo
+
+Este informe presenta un análisis exploratorio de los tiempos de viaje y el indicador **TTR** (Travel-Time Ratio).
+Se utiliza el dataset provisto (`TrabajoPractico1_Viajes.xlsx`) y se calcula la duración de la actividad como el tiempo entre la llegada y la siguiente salida del mismo individuo en el mismo día (estimación).
+
+## Estadísticas generales
+
+```{r summary}
+overall <- df %>% summarise(n_trips=n(), mean_travel = mean(travel_minutes, na.rm=TRUE), mean_activity = mean(activity_duration_mins, na.rm=TRUE), mean_TTR=mean(TTR, na.rm=TRUE))
+knitr::kable(overall)
+```
+
+## Visualizaciones
+
+### Distribución de tiempos de viaje
+```{r plot1, fig.cap='Distribución de tiempos de viaje'}
+ggplot(df, aes(x=travel_minutes)) + geom_histogram(bins=50) + theme_minimal()
+```
+
+### Boxplot por motivo (top 8)
+```{r plot2, fig.cap='Tiempos de viaje por motivo (top 8)'}
+by_motive <- df %>% group_by(Motivo.del.Viaje) %>% summarise(trips=n(), mean_travel=mean(travel_minutes, na.rm=TRUE), mean_TTR=mean(TTR, na.rm=TRUE)) %>% arrange(desc(trips))
+top_motives <- head(by_motive$Motivo.del.Viaje, 8)
+ggplot(df %>% filter(Motivo.del.Viaje %in% top_motives), aes(x=reorder(Motivo.del.Viaje, travel_minutes, FUN=median), y=travel_minutes)) + geom_boxplot() + coord_flip() + theme_minimal()
+```
+
+### Distribución de TTR
+```{r plot3, fig.cap='Distribución de TTR'}
+ggplot(df %>% filter(!is.na(TTR)), aes(x=TTR)) + geom_histogram(bins=40) + theme_minimal()
+```
+
+## Conclusiones y decisiones metodológicas
+
+- Se estimó `activity_duration` a partir de la siguiente salida del mismo usuario en el mismo día. Esto implica que actividades finales del día no tienen duración estimada.
+- Se recomienda comparar los resultados con sensibilidad variando la ventana temporal (por ejemplo, si la siguiente salida es > 8 horas considerar NA porque puede tratarse de otra jornada).
+- Interpretar TTR con precaución: valores altos pueden corresponder a viajes muy largos o actividades muy cortas.
+
+---
