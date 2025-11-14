@@ -17,15 +17,23 @@ y calcula métricas adicionales de movilidad urbana para el trabajo práctico.
 ---
 
 ### 2. Instalación de R
+Para instalar R (lenguaje)
 
-#### 2.1. Instalar R desde los repositorios de Ubuntu/Debian
+    sudo apt install --no-install-recommends software-properties-common dirmngr
+    wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | sudo tee -a /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
+    sudo add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
+    sudo apt update
+    sudo apt install r-base
 
-Abrir una terminal y ejecutar:
+Para ejecutarlo: Opcion 1: Rscript /ruta/a/tu/archivo.r Opcion 2:
 
-```bash
-sudo apt update
-sudo apt install r-base r-base-dev
-```
+    Abro R en una terminal: R (esto abre una consola de R)
+    Dentro de la consola: > source("ruta al archivo.R")
+    para salir de la consola: > quit()
+
+Al ejecutarlo se crean los .png que son los graficos, un htlm que es un informe de lo que se ejecuto junto con los resultados
+
+
 
 ### 3. Paquetes necesarios
 Ejecute en la terminal:
@@ -63,4 +71,7 @@ abrir una terminal y ejecutar
 R
 ```
 Dentro de la consola de R escribiir:
+```bash
 source("TrabajoPractico.R", encoding = "UTF-8")
+tabla_tiempo_promedio_motivo
+```
