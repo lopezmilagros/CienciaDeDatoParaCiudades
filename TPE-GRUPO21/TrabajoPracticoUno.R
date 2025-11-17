@@ -2,7 +2,7 @@
 ## CIENCIA DE DATOS PARA CIUDADES
 ## TP especial - Movilidad y tiempos de viaje
 ## Dataset: "Viajes origen destino optativa Exactas.xlsx"
-## Lenguaje: R
+## Lenguaje: R (Corregido y Optimizado)
 ## ============================================================
 
 # 1) Paquetes necesarios --------------------------------------
@@ -10,44 +10,53 @@ library(readxl)   # leer Excel
 library(dplyr)    # manipular datos
 library(janitor)  # limpiar nombres de columnas
 library(ggplot2)  # gráficos (opcional)
+library(tidyr)    # Requerido para el heatmap (se movió al inicio)
 
 # 2) Carga y limpieza del dataset -----------------------------
 ruta_archivo <- ("Viajes origen destino optativa Exactas.xlsx")
 
 viajes <- read_excel(ruta_archivo) %>%
   clean_names()
-# columnas principales después de clean_names():
-# identificacion
-# zona_residencia
-# zona_origen
-# zona_destino
-# hora_inicio
-# hora_fin
-# tiempo_de_duracion_del_viaje_en_minutos
-# motivo_del_viaje
-# movil
-# dia
-# tipo_de_dia
-# lugar_semantico_de_origen
-# lugar_semantico_de_destino
 
+# 3) TABLAS DE TIEMPO PROMEDIO Y TTR ---------------------------
 
-# 3) TABLA PRINCIPAL DEL TP:
-#    Tiempo promedio de viaje por motivo ----------------------
+# 3.1) Tiempo promedio de viaje por persona y motivo (Individual)
+tiempo_promedio_persona_motivo <- viajes %>%
+  group_by(identificacion, motivo_del_viaje) %>%
+  summarise(
+    promedio_persona_actividad = mean(tiempo_de_duracion_del_viaje_en_minutos,
+                                      na.rm = TRUE),
+    .groups = "drop"
+  )
 
-tabla_tiempo_promedio_motivo <- viajes %>%
+# 3.2) Tiempo promedio de viaje general por motivo (Global)
+tiempo_promedio_general_motivo <- viajes %>%
   group_by(motivo_del_viaje) %>%
   summarise(
     tiempo_promedio_min = mean(tiempo_de_duracion_del_viaje_en_minutos,
-                               na.rm = TRUE)
+                               na.rm = TRUE),
+    .groups = "drop" # Usar .groups = "drop" en vez de ungroup()
   ) %>%
-  ungroup() %>%
   mutate(
-    tiempo_promedio_min = round(tiempo_promedio_min, 6)
+    tiempo_promedio_min = round(tiempo_promedio_min, 2)
   ) %>%
   arrange(desc(tiempo_promedio_min))
 
-tabla_tiempo_promedio_motivo
+# 3.3) Cálculo de TTR simple
+tiempo_promedio_total <- mean(viajes$tiempo_de_duracion_del_viaje_en_minutos,
+                               na.rm = TRUE)
+
+ttr_por_motivo <- tiempo_promedio_general_motivo %>%
+  mutate(
+    TTR = tiempo_promedio_min / tiempo_promedio_total,
+    TTR = round(TTR, 3)
+  ) %>%
+  arrange(desc(TTR))
+
+# Mostrar las tablas principales
+tiempo_promedio_persona_motivo
+tiempo_promedio_general_motivo
+ttr_por_motivo
 
 
 # 4) OTRAS MÉTRICAS QUE PIDEN EN LAS PAUTAS -------------------
@@ -100,9 +109,9 @@ tiempo_promedio_motivo_tipo_dia
 
 # 5) Gráficos --------------------------
 
-#boxplot
-
-ggplot(tabla_tiempo_promedio_motivo,
+# 5.1 Gráfico de barras (box plot original) - USANDO LA TABLA GLOBAL
+# Uso 'tiempo_promedio_general_motivo' ya que tiene la columna 'tiempo_promedio_min'
+ggplot(tiempo_promedio_general_motivo,
        aes(x = reorder(motivo_del_viaje, tiempo_promedio_min),
            y = tiempo_promedio_min)) +
   geom_col() +
@@ -110,21 +119,14 @@ ggplot(tabla_tiempo_promedio_motivo,
   labs(
     x = "Motivo del viaje",
     y = "Tiempo promedio de viaje (minutos)",
-    title = "Tiempo promedio de viaje por motivo"
+    title = "Tiempo promedio de viaje por motivo (Global)"
   ) +
   theme_minimal()
 
-#grafico de barras
-
-library(ggplot2)
-library(dplyr)
-
-viajes_por_motivo <- viajes %>%
-  count(motivo_del_viaje, name = "cantidad") %>%
-  arrange(cantidad)
-
+# 5.2 Gráfico de barras de cantidad de viajes
+# Uso 'viajes_por_motivo' que ya fue creado en 4.2
 ggplot(viajes_por_motivo,
-       aes(x = reorder(motivo_del_viaje, cantidad), y = cantidad)) +
+       aes(x = reorder(motivo_del_viaje, cantidad_viajes), y = cantidad_viajes)) + # CORREGIDO: Usar 'cantidad_viajes'
   geom_col(fill = "steelblue") +
   coord_flip() +
   labs(
@@ -134,8 +136,7 @@ ggplot(viajes_por_motivo,
   ) +
   theme_minimal()
 
-#histograma
-
+# 5.3 Histograma de la distribución general
 ggplot(viajes, aes(x = tiempo_de_duracion_del_viaje_en_minutos)) +
   geom_histogram(bins = 30, fill = "skyblue", color = "black") +
   labs(
@@ -145,7 +146,7 @@ ggplot(viajes, aes(x = tiempo_de_duracion_del_viaje_en_minutos)) +
   ) +
   theme_minimal()
 
-#box plot por tipo de dia
+# 5.4 Box plot por tipo de dia
 ggplot(viajes,
        aes(x = tipo_de_dia,
            y = tiempo_de_duracion_del_viaje_en_minutos,
@@ -158,16 +159,10 @@ ggplot(viajes,
   ) +
   theme_minimal()
 
-#heatmap: tiempo promedio por motivo y tipo de dia
-library(tidyr)
-
-tabla_heatmap <- viajes %>%
-  group_by(tipo_de_dia, motivo_del_viaje) %>%
-  summarise(promedio = mean(tiempo_de_duracion_del_viaje_en_minutos, na.rm = TRUE)) %>%
-  ungroup()
-
-ggplot(tabla_heatmap,
-       aes(x = motivo_del_viaje, y = tipo_de_dia, fill = promedio)) +
+# 5.5 Heatmap: tiempo promedio por motivo y tipo de dia
+# Usamos 'tiempo_promedio_motivo_tipo_dia' que ya fue creada
+ggplot(tiempo_promedio_motivo_tipo_dia, # CORREGIDO: Usar la tabla ya existente
+       aes(x = motivo_del_viaje, y = tipo_de_dia, fill = tiempo_promedio_min)) +
   geom_tile(color = "white") +
   scale_fill_gradient(low = "lightblue", high = "darkblue") +
   coord_flip() +
@@ -180,7 +175,7 @@ ggplot(tabla_heatmap,
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-#Scatterplot: hora de inicio vs tiempo de viaje
+# 5.6 Scatterplot: hora de inicio vs tiempo de viaje
 ggplot(viajes,
        aes(x = hora_inicio, y = tiempo_de_duracion_del_viaje_en_minutos)) +
   geom_point(alpha = 0.2, color = "steelblue") +
@@ -190,8 +185,3 @@ ggplot(viajes,
     y = "Duración (min)"
   ) +
   theme_minimal()
-
- 
-
-
-
